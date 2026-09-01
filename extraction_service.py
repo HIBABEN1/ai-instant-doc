@@ -1,108 +1,209 @@
 """
+Cœur intelligence du pipeline.
 
-Cœur "intelligence" du pipeline utilisant Llama 3 via Ollama.
-Transforme des données brutes (notes, Jira, Excel) en un objet Pydantic `RapportRecette`.
+Utilise Groq Cloud en production et Ollama en local.
 
-Étapes :
-1. Instanciation du client ChatOllama (Llama 3).
-2. Contrainte de la sortie via `with_structured_output(RapportRecette)`.
-3. Envoi du System Prompt et Human Message.
-4. Boucle de correction (Repair Prompt) en cas d'erreur de validation.
+Pipeline :
+
+Données brutes
+      ↓
+   ChatGroq
+      ↓
+Structured Output
+      ↓
+RapportRecette
+      ↓
+Validation Pydantic
 """
 
 import os
 import logging
+
+import streamlit as st
+
 from langchain_ollama import ChatOllama
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 from pydantic import ValidationError
 from langchain_core.exceptions import OutputParserException
+
 from models import RapportRecette
+
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """Tu es un expert en analyse de campagnes de recette logicielle. 
-Ton rôle est d'extraire et structurer les informations des données brutes (notes, tickets Jira, fichiers Excel) 
-en un rapport de recette validé et complet. 
-Réponds toujours en JSON valide et respecte strictement la structure demandée."""
+
+SYSTEM_PROMPT = """
+Tu es un expert en analyse de campagnes de recette logicielle.
+
+Ton rôle est d'extraire et structurer les informations des données
+brutes provenant de notes, tickets Jira et fichiers Excel.
+
+Tu dois produire un rapport de recette complet et cohérent.
+
+Respecte strictement la structure Pydantic demandée.
+Ne crée aucune information qui n'est pas présente dans les données.
+"""
+
 
 def _construire_client_llm():
-    """Détecte si on utilise Groq (Cloud) ou Ollama (Local)."""
-    
-    # On regarde si une clé Groq existe dans l'environnement
-    api_key = os.environ.get("GROQ_API_KEY")
+    """
+    Détecte automatiquement Groq Cloud ou Ollama Local.
+    """
+
+    # --------------------------------------------------
+    # 1. Récupération de la clé Groq
+    # --------------------------------------------------
+
+    api_key = None
+
+    # Streamlit Cloud / Streamlit secrets
+    try:
+        api_key = st.secrets["GROQ_API_KEY"]
+    except (KeyError, FileNotFoundError):
+        pass
+
+    # Fallback environnement / .env
+    if not api_key:
+        api_key = os.environ.get("GROQ_API_KEY")
+
+    # --------------------------------------------------
+    # 2. Groq Cloud
+    # --------------------------------------------------
+
     if api_key:
-        # MODE CLOUD (Pour ton site internet)
+
+        logger.info("LLM sélectionné : Groq Cloud")
+
         return ChatGroq(
-            model_name="mixtral-8x7b-32768",
+            model="openai/gpt-oss-120b",
             groq_api_key=api_key,
             temperature=0
         )
-    else:
-        # MODE LOCAL (Pour ton PC avec Ollama)
-        return ChatOllama(
-            model="llama3.2",
-            base_url="http://localhost:11434",
-            format="json",
-            temperature=0
-        )
 
-def extraire_rapport(texte_brut: str, max_tentatives: int = 3) -> RapportRecette:
-    """Transforme un texte brut en `RapportRecette` validé via Llama 3.
+    # --------------------------------------------------
+    # 3. Ollama Local
+    # --------------------------------------------------
 
-    Args:
-        texte_brut: contenu textuel normalisé de toutes les sources.
-        max_tentatives: nombre d'essais en cas d'erreur de formatage.
+    logger.info("LLM sélectionné : Ollama Local")
 
-    Returns:
-        Instance de RapportRecette validée et calculée.
+    return ChatOllama(
+        model="llama3.2",
+        base_url="http://localhost:11434",
+        format="json",
+        temperature=0
+    )
+
+
+def extraire_rapport(
+    texte_brut: str,
+    max_tentatives: int = 3
+) -> RapportRecette:
+
     """
+    Transforme les données brutes en RapportRecette.
+    """
+
     llm = _construire_client_llm()
 
-    # Configuration du format de sortie structuré basé sur le modèle Pydantic
-    llm_structure = llm.with_structured_output(RapportRecette)
+    # Structured output Pydantic
+    llm_structure = llm.with_structured_output(
+        RapportRecette
+    )
 
     messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
-        HumanMessage(content=f"Voici les données brutes de la campagne de recette :\n\n{texte_brut}"),
+        SystemMessage(
+            content=SYSTEM_PROMPT
+        ),
+        HumanMessage(
+            content=(
+                "Voici les données brutes de la campagne "
+                "de recette :\n\n"
+                f"{texte_brut}"
+            )
+        ),
     ]
 
-    derniere_erreur: Exception | None = None
+    derniere_erreur = None
 
-    for tentative in range(1, max_tentatives + 1):
+    # --------------------------------------------------
+    # Boucle de tentative
+    # --------------------------------------------------
+
+    for tentative in range(
+        1,
+        max_tentatives + 1
+    ):
+
         try:
-            logger.info("Extraction Llama 3 (Ollama) - tentative %s/%s", tentative, max_tentatives)
-            
-            # Appel au modèle
-            rapport: RapportRecette = llm_structure.invoke(messages)
 
-            # Re-validation Pydantic pour s'assurer de l'intégrité de l'objet
-            # (nécessaire car le LLM peut renvoyer un dictionnaire ou un objet selon l'appel)
-            if not isinstance(rapport, RapportRecette):
-                rapport = RapportRecette.model_validate(rapport)
-            
-            # Calcul automatique des champs dérivés (ex: anomalies_bloquantes)
+            logger.info(
+                "Extraction LLM - tentative %s/%s",
+                tentative,
+                max_tentatives
+            )
+
+            # Appel LLM
+            rapport = llm_structure.invoke(
+                messages
+            )
+
+            # --------------------------------------------------
+            # Validation Pydantic
+            # --------------------------------------------------
+
+            if not isinstance(
+                rapport,
+                RapportRecette
+            ):
+
+                rapport = RapportRecette.model_validate(
+                    rapport
+                )
+
+            # --------------------------------------------------
+            # Champs dérivés
+            # --------------------------------------------------
+
             rapport.calculer_champs_derives()
-            
-            logger.info("Extraction réussie avec succès.")
+
+            logger.info(
+                "Extraction réussie."
+            )
+
             return rapport
 
-        except (ValidationError, OutputParserException, Exception) as erreur:
-            derniere_erreur = erreur
-            logger.warning("Échec de validation (tentative %s) : %s", tentative, erreur)
+        except Exception as erreur:
 
-            # Boucle de réparation : on fournit l'erreur technique au LLM pour correction
+            derniere_erreur = erreur
+
+            logger.warning(
+                "Échec tentative %s : %s",
+                tentative,
+                erreur
+            )
+
+            # --------------------------------------------------
+            # Tentative de réparation
+            # --------------------------------------------------
+
             messages.append(
                 HumanMessage(
                     content=(
-                        "Ta réponse précédente est invalide. "
-                        f"Erreur de validation Pydantic :\n{erreur}\n\n"
-                        "Corrige ta réponse en respectant strictement le format JSON et les valeurs autorisées."
+                        "Ta réponse précédente est invalide.\n\n"
+                        f"Erreur : {erreur}\n\n"
+                        "Corrige ta réponse et respecte "
+                        "strictement la structure demandée."
                     )
                 )
             )
 
+    # --------------------------------------------------
+    # Échec définitif
+    # --------------------------------------------------
+
     raise ValueError(
-        f"Échec de l'extraction après {max_tentatives} tentatives. "
-        f"Dernière erreur enregistrée : {derniere_erreur}"
+        f"Échec de l'extraction après "
+        f"{max_tentatives} tentatives. "
+        f"Dernière erreur : {derniere_erreur}"
     )
