@@ -34,7 +34,7 @@ def _construire_client_llm():
     if api_key:
         # MODE CLOUD (Pour ton site internet)
         return ChatGroq(
-            model_name="llama-3.3-70b-versatile",
+            model_name="llama-3.2-3b-preview",
             groq_api_key=api_key,
             temperature=0
         )
