@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from extraction_service import extraire_rapport
 from doc_service import generer_document_en_memoire
 
+
 # Configuration de la page
 st.set_page_config(
     page_title="Capgemini | AI-Instant-Doc",
@@ -15,36 +16,56 @@ st.set_page_config(
     layout="wide"
 )
 
+
 # -------------------------
 # En-tête
 # -------------------------
 st.title("📄 AI-Instant-Doc")
-st.subheader("Génération instantanée de Compte-Rendu de Recette par IA")
+
+st.subheader(
+    "Génération instantanée de Compte-Rendu de Recette par IA"
+)
+
 
 # -------------------------
 # Sidebar
 # -------------------------
 with st.sidebar:
-    st.image("logo_capgemini.png", width=200)
 
-st.info(
-    "Cet outil utilise une IA générative pour analyser les données "
-    "de recette et générer automatiquement un compte-rendu structuré."
-)
+    st.image(
+        "logo_capgemini.png",
+        width=200
+    )
+
+    st.info(
+        "Cet outil utilise une IA générative pour analyser les "
+        "données de recette et générer automatiquement un "
+        "compte-rendu structuré."
+    )
+
     st.markdown("## 📄 Template Word")
 
     template_file = st.file_uploader(
         "Choisissez votre modèle Word (.docx)",
         type=["docx"],
-        help="Le document doit contenir les balises Jinja2 ({{ }}, {% %}) utilisées par AI-Instant-Doc."
+        help=(
+            "Le document doit contenir les balises Jinja2 "
+            "({{ }}, {% %}) utilisées par AI-Instant-Doc."
+        )
     )
+
 
 # -------------------------
 # Interface
 # -------------------------
 col1, col2 = st.columns(2)
 
+
+# =========================
+# COLONNE 1
+# =========================
 with col1:
+
     st.markdown("### 1️⃣ Données d'entrée")
 
     notes_brutes = st.text_area(
@@ -70,6 +91,10 @@ Statut : Ouverte
         use_container_width=True
     )
 
+
+# =========================
+# COLONNE 2
+# =========================
 with col2:
 
     st.markdown("### 2️⃣ Résultat")
@@ -77,44 +102,84 @@ with col2:
     if generer_btn:
 
         if not template_file:
-            st.warning("Veuillez d'abord téléverser un template Word (.docx).")
+
+            st.warning(
+                "Veuillez d'abord téléverser un template Word (.docx)."
+            )
 
         elif not notes_brutes.strip():
-            st.warning("Veuillez saisir les données de recette.")
+
+            st.warning(
+                "Veuillez saisir les données de recette."
+            )
 
         else:
 
             try:
 
-                with st.spinner("🧠 Analyse des données par IA..."):
+                # -------------------------
+                # Extraction IA
+                # -------------------------
+                with st.spinner(
+                    "🧠 Analyse des données par IA..."
+                ):
 
-                    rapport = extraire_rapport(notes_brutes)
+                    rapport = extraire_rapport(
+                        notes_brutes
+                    )
 
-                st.success("Extraction réussie ✅")
+                st.success(
+                    "Extraction réussie ✅"
+                )
 
-                with st.expander("Voir les données structurées"):
+                # -------------------------
+                # Données structurées
+                # -------------------------
+                with st.expander(
+                    "Voir les données structurées"
+                ):
 
-                    st.json(rapport.model_dump())
+                    st.json(
+                        rapport.model_dump()
+                    )
 
-                with st.spinner("📄 Génération du document Word..."):
+                # -------------------------
+                # Génération Word
+                # -------------------------
+                with st.spinner(
+                    "📄 Génération du document Word..."
+                ):
 
                     document = generer_document_en_memoire(
                         template_file,
                         rapport
                     )
 
+                # -------------------------
+                # Téléchargement
+                # -------------------------
                 st.download_button(
                     "📥 Télécharger le Compte-Rendu",
                     data=document,
                     file_name="CR_Recette_Genere.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    mime=(
+                        "application/vnd.openxmlformats-officedocument."
+                        "wordprocessingml.document"
+                    ),
                     use_container_width=True,
                 )
 
                 st.balloons()
 
             except Exception as e:
-                st.error(f"Erreur : {e}")
+
+                st.error(
+                    f"Erreur : {e}"
+                )
 
     else:
-        st.info("Téléversez un template Word puis saisissez vos données pour commencer.")
+
+        st.info(
+            "Téléversez un template Word puis saisissez vos données "
+            "pour commencer."
+        )
