@@ -19,7 +19,7 @@ st.set_page_config(
 # En-tête
 # -------------------------
 st.title("📄 AI-Instant-Doc")
-st.subheader("Génération instantanée de Compte-Rendu de Recette par IA (Llama 3 + Ollama)")
+st.subheader("Génération instantanée de Compte-Rendu de Recette par IA")
 
 # -------------------------
 # Sidebar
@@ -27,10 +27,10 @@ st.subheader("Génération instantanée de Compte-Rendu de Recette par IA (Llama
 with st.sidebar:
     st.image("logo_capgemini.png", width=200)
 
-    st.info(
-        "Cet outil utilise Llama 3 exécuté localement via Ollama afin de garantir la confidentialité des données."
-    )
-
+st.info(
+    "Cet outil utilise une IA générative pour analyser les données "
+    "de recette et générer automatiquement un compte-rendu structuré."
+)
     st.markdown("## 📄 Template Word")
 
     template_file = st.file_uploader(
@@ -86,7 +86,7 @@ with col2:
 
             try:
 
-                with st.spinner("🧠 Analyse des données par Llama 3..."):
+                with st.spinner("🧠 Analyse des données par IA..."):
 
                     rapport = extraire_rapport(notes_brutes)
 
