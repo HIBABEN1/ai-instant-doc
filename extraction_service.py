@@ -51,25 +51,21 @@ def _construire_client_llm():
     Détecte automatiquement Groq Cloud ou Ollama Local.
     """
 
-    # --------------------------------------------------
     # 1. Récupération de la clé Groq
-    # --------------------------------------------------
+ 
 
     api_key = None
 
-    # Streamlit Cloud / Streamlit secrets
     try:
         api_key = st.secrets["GROQ_API_KEY"]
     except (KeyError, FileNotFoundError):
         pass
 
-    # Fallback environnement / .env
+
     if not api_key:
         api_key = os.environ.get("GROQ_API_KEY")
 
-    # --------------------------------------------------
-    # 2. Groq Cloud
-    # --------------------------------------------------
+
 
     if api_key:
 
@@ -81,9 +77,7 @@ def _construire_client_llm():
             temperature=0
         )
 
-    # --------------------------------------------------
-    # 3. Ollama Local
-    # --------------------------------------------------
+
 
     logger.info("LLM sélectionné : Ollama Local")
 
@@ -126,9 +120,6 @@ def extraire_rapport(
 
     derniere_erreur = None
 
-    # --------------------------------------------------
-    # Boucle de tentative
-    # --------------------------------------------------
 
     for tentative in range(
         1,
@@ -161,9 +152,7 @@ def extraire_rapport(
                     rapport
                 )
 
-            # --------------------------------------------------
-            # Champs dérivés
-            # --------------------------------------------------
+
 
             rapport.calculer_champs_derives()
 
@@ -183,9 +172,7 @@ def extraire_rapport(
                 erreur
             )
 
-            # --------------------------------------------------
-            # Tentative de réparation
-            # --------------------------------------------------
+
 
             messages.append(
                 HumanMessage(
@@ -198,9 +185,6 @@ def extraire_rapport(
                 )
             )
 
-    # --------------------------------------------------
-    # Échec définitif
-    # --------------------------------------------------
 
     raise ValueError(
         f"Échec de l'extraction après "
