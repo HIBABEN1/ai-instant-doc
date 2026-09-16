@@ -87,7 +87,7 @@ class RapportRecette(BaseModel):
                      "rédigée dans un style professionnel adapté à un document contractuel.",
     )
 
-    # Champ calculé côté service (pas demandé au LLM) mais utile pour les
+    # Champ calculé côté service (pas demandé au LLM) mais utile
     # conditions Jinja2 du template ({% if anomalies_bloquantes %} ... {% endif %})
     anomalies_bloquantes: Optional[bool] = Field(
         default=None,
